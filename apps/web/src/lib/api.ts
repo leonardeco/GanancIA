@@ -49,6 +49,19 @@ export const api = {
       request<unknown>(`/menu/restaurants/${restaurantId}/menu/${itemId}`, { method: "PUT", body: JSON.stringify(data) }),
     delete: (restaurantId: string, itemId: string) =>
       request<void>(`/menu/restaurants/${restaurantId}/menu/${itemId}`, { method: "DELETE" }),
+    simulate: (restaurantId: string, itemId: string, newPrice: number) =>
+      request<{
+        itemName: string
+        costPrice: number
+        currentPrice: number
+        newPrice: number
+        currentMargin: number
+        newMargin: number
+        monthlyUnits: number
+        currentMonthlyProfit: number
+        newMonthlyProfit: number
+        monthlyDelta: number
+      }>(`/menu/restaurants/${restaurantId}/menu/${itemId}/simulate?newPrice=${newPrice}`),
   },
   sales: {
     list: (branchId: string) => request<unknown[]>(`/sales/branches/${branchId}/sales`),
@@ -79,8 +92,22 @@ export const api = {
   },
   alerts: {
     list: (restaurantId: string) => request<unknown[]>(`/alerts/restaurants/${restaurantId}`),
-    resolve: (restaurantId: string, alertId: string) => 
-      request<{ success: boolean; message: string }>(`/alerts/restaurants/${restaurantId}/${alertId}/resolve`, { method: "PUT" })
+    resolve: (restaurantId: string, alertId: string) =>
+      request<{ success: boolean; message: string }>(`/alerts/restaurants/${restaurantId}/${alertId}/resolve`, { method: "PUT" }),
+  },
+  inventory: {
+    list: (restaurantId: string) =>
+      request<unknown[]>(`/inventory/restaurants/${restaurantId}/inventory`),
+    create: (
+      restaurantId: string,
+      data: { ingredient: string; theoreticalCost: number; realCost: number; date?: string }
+    ) =>
+      request<unknown>(`/inventory/restaurants/${restaurantId}/inventory`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    delete: (restaurantId: string, id: string) =>
+      request<void>(`/inventory/restaurants/${restaurantId}/inventory/${id}`, { method: "DELETE" }),
   },
 }
 

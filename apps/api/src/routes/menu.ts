@@ -120,6 +120,60 @@ const menuRoutes: FastifyPluginAsync = async (app) => {
     await app.db.delete(menuItems).where(and(eq(menuItems.id, itemId), eq(menuItems.restaurantId, restaurantId)))
     return reply.status(204).send()
   })
+
+  // Simulador de precios — calcula impacto mensual de cambiar el precio de un plato
+  app.get("/restaurants/:restaurantId/menu/:itemId/simulate", async (req, reply) => {
+    const { sub } = req.user as { sub: string }
+    const { restaurantId, itemId } = req.params as { restaurantId: string; itemId: string }
+    const { newPrice } = z.object({ newPrice: z.coerce.number().positive() }).parse(req.query)
+
+    const restaurant = await app.db.query.restaurants.findFirst({
+      where: and(eq(restaurants.id, restaurantId), eq(restaurants.ownerId, sub)),
+    })
+    if (!restaurant) return reply.status(404).send({ error: "Restaurante no encontrado" })
+
+    const item = await app.db.query.menuItems.findFirst({
+      where: and(eq(menuItems.id, itemId), eq(menuItems.restaurantId, restaurantId)),
+    })
+    if (!item) return reply.status(404).send({ error: "Plato no encontrado" })
+
+    // Unidades vendidas en los ultimos 30 dias
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const [salesAgg] = await app.db
+      .select({ units: sql<number>`COALESCE(sum(${sales.quantity}), 0)` })
+      .from(sales)
+      .where(
+        and(
+          eq(sales.menuItemId, itemId),
+          sql`${sales.saleDate} >= ${thirtyDaysAgo}`
+        )
+      )
+
+    const monthlyUnits = Number(salesAgg?.units ?? 0)
+    const cost = Number(item.costPrice)
+    const currentPrice = Number(item.salePrice)
+
+    const currentMargin = currentPrice > 0 ? ((currentPrice - cost) / currentPrice) * 100 : 0
+    const newMargin = newPrice > 0 ? ((newPrice - cost) / newPrice) * 100 : 0
+    const currentMonthlyProfit = (currentPrice - cost) * monthlyUnits
+    const newMonthlyProfit = (newPrice - cost) * monthlyUnits
+    const monthlyDelta = newMonthlyProfit - currentMonthlyProfit
+
+    return {
+      itemName: item.name,
+      costPrice: cost,
+      currentPrice,
+      newPrice,
+      currentMargin: Math.round(currentMargin * 10) / 10,
+      newMargin: Math.round(newMargin * 10) / 10,
+      monthlyUnits,
+      currentMonthlyProfit: Math.round(currentMonthlyProfit * 100) / 100,
+      newMonthlyProfit: Math.round(newMonthlyProfit * 100) / 100,
+      monthlyDelta: Math.round(monthlyDelta * 100) / 100,
+    }
+  })
 }
 
 export default menuRoutes

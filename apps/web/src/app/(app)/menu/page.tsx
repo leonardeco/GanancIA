@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { Plus, Pencil, Trash2, Star, Puzzle, Swords, Dog } from "lucide-react"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { Plus, Pencil, Trash2, Star, Puzzle, Swords, Dog, Calculator, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { api, ApiError } from "@/lib/api"
 import { useAuthStore } from "@/store/auth"
 import { useRestaurantStore } from "@/store/restaurant"
 import { DEMO_MENU_ITEMS } from "@/lib/mock-data"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import type { MenuItem, MenuCategory } from "@ganancia/shared"
 
 const DEMO_TOKEN = "demo-token"
@@ -94,6 +95,173 @@ function ItemForm({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+interface SimResult {
+  itemName: string
+  costPrice: number
+  currentPrice: number
+  newPrice: number
+  currentMargin: number
+  newMargin: number
+  monthlyUnits: number
+  currentMonthlyProfit: number
+  newMonthlyProfit: number
+  monthlyDelta: number
+}
+
+function PriceSimulator({ items, restaurantId }: { items: MenuItem[]; restaurantId: string }) {
+  const [selectedId, setSelectedId] = useState("")
+  const [newPrice, setNewPrice] = useState("")
+  const [result, setResult] = useState<SimResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const selected = items.find((i) => i.id === selectedId)
+
+  useEffect(() => {
+    if (!selectedId) return
+    const item = items.find((i) => i.id === selectedId)
+    if (item) setNewPrice(String(item.salePrice))
+    setResult(null)
+  }, [selectedId, items])
+
+  useEffect(() => {
+    if (!selectedId || !newPrice || Number(newPrice) <= 0) { setResult(null); return }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const res = await api.menu.simulate(restaurantId, selectedId, Number(newPrice))
+        setResult(res)
+      } catch { /* ignore */ } finally {
+        setLoading(false)
+      }
+    }, 600)
+  }, [selectedId, newPrice, restaurantId])
+
+  const fmt = (n: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n)
+
+  return (
+    <div className="mt-10 border border-bosque/20 bg-menta/20 rounded-2xl p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-9 h-9 bg-bosque rounded-xl flex items-center justify-center">
+          <Calculator size={16} className="text-white" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-carbon">Simulador de precios</h3>
+          <p className="text-xs text-gray-400">¿Cuánto más ganarías si subís el precio de un plato?</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Plato</label>
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-bosque/30 bg-white"
+          >
+            <option value="">Elegí un plato...</option>
+            {items.map((i) => (
+              <option key={i.id} value={i.id}>{i.name} — ${i.salePrice}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Nuevo precio de venta</label>
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={newPrice}
+            onChange={(e) => setNewPrice(e.target.value)}
+            disabled={!selectedId}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-bosque/30 bg-white disabled:bg-gray-50 disabled:text-gray-300"
+            placeholder="0.00"
+          />
+        </div>
+      </div>
+
+      {selected && newPrice && (
+        <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-sm font-semibold text-carbon">{selected.name}</p>
+            <span className="text-xs text-gray-400">· Costo: {fmt(selected.costPrice)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Precio actual → Margen actual</p>
+              <p className="text-sm font-mono font-medium text-carbon">
+                {fmt(selected.salePrice)} → <span className={selected.margin >= 50 ? "text-bosque" : "text-orange-500"}>{selected.margin.toFixed(1)}%</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Precio nuevo → Margen nuevo</p>
+              {result ? (
+                <p className="text-sm font-mono font-medium text-carbon">
+                  {fmt(result.newPrice)} → <span className={result.newMargin >= 50 ? "text-bosque" : "text-orange-500"}>{result.newMargin.toFixed(1)}%</span>
+                </p>
+              ) : (
+                <p className="text-sm text-gray-300">—</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className="text-center py-4 text-xs text-gray-400 animate-pulse">Calculando impacto...</div>
+      )}
+
+      {result && !loading && (
+        <div className={cn(
+          "rounded-2xl p-5 border",
+          result.monthlyDelta > 0 ? "bg-emerald-50 border-emerald-200" :
+          result.monthlyDelta < 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
+        )}>
+          <div className="flex items-center gap-2 mb-4">
+            {result.monthlyDelta > 0
+              ? <TrendingUp size={18} className="text-emerald-600" />
+              : result.monthlyDelta < 0
+              ? <TrendingDown size={18} className="text-red-500" />
+              : <Minus size={18} className="text-gray-400" />}
+            <p className={cn(
+              "font-semibold text-sm",
+              result.monthlyDelta > 0 ? "text-emerald-700" : result.monthlyDelta < 0 ? "text-red-600" : "text-gray-500"
+            )}>
+              {result.monthlyDelta > 0
+                ? `Ganarías ${fmt(result.monthlyDelta)} más por mes`
+                : result.monthlyDelta < 0
+                ? `Perderías ${fmt(Math.abs(result.monthlyDelta))} por mes`
+                : "Sin cambio en rentabilidad mensual"}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Unidades/mes</p>
+              <p className="font-bold text-carbon">{result.monthlyUnits}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Ganancia actual</p>
+              <p className="font-bold text-carbon">{fmt(result.currentMonthlyProfit)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Ganancia nueva</p>
+              <p className={cn("font-bold", result.newMonthlyProfit > result.currentMonthlyProfit ? "text-emerald-600" : "text-red-500")}>
+                {fmt(result.newMonthlyProfit)}
+              </p>
+            </div>
+          </div>
+          {result.monthlyUnits === 0 && (
+            <p className="text-xs text-gray-400 mt-3 text-center">
+              Sin ventas registradas en los últimos 30 días. El cálculo está basado en proyección.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -280,6 +448,9 @@ export default function MenuPage() {
               </div>
             )
           })}
+          {items.length > 0 && !isDemo && (
+            <PriceSimulator items={items} restaurantId={activeRestaurant.id} />
+          )}
         </>
       )}
     </div>

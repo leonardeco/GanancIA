@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, UtensilsCrossed, TrendingUp, LogOut, ChefHat, Sparkles, AlertTriangle } from "lucide-react"
+import { LayoutDashboard, UtensilsCrossed, TrendingUp, LogOut, ChefHat, Sparkles, AlertTriangle, Package } from "lucide-react"
 import { useAuthStore } from "@/store/auth"
 import { RestaurantSelector } from "./restaurant-selector"
 import { cn } from "@/lib/utils"
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/menu", label: "Menú", icon: UtensilsCrossed },
   { href: "/ventas", label: "Ventas", icon: TrendingUp },
+  { href: "/inventario", label: "Inventario", icon: Package },
   { href: "/fugas", label: "Fugas", icon: AlertTriangle },
   { href: "/chat", label: "Gana IA", icon: Sparkles },
 ]

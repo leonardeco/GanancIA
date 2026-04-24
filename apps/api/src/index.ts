@@ -12,6 +12,7 @@ import analyticsRoutes from "./routes/analytics.js"
 import importRoutes from "./routes/import.js"
 import { chatRoutes } from "./routes/chat.js"
 import alertsRoutes from "./routes/alerts.js"
+import inventoryRoutes from "./routes/inventory.js"
 
 const app = Fastify({ logger: true })
 
@@ -43,6 +44,7 @@ async function start() {
   await app.register(importRoutes)
   await app.register(chatRoutes, { prefix: "/chat" })
   await app.register(alertsRoutes, { prefix: "/alerts" })
+  await app.register(inventoryRoutes, { prefix: "/inventory" })
 
   const port = Number(process.env.PORT ?? 4000)
   await app.listen({ port, host: "0.0.0.0" })
