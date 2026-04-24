@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.625rem;
+    --bosque: #0F6E56;
+    --teal: #1D9E75;
+    --menta: #E1F5EE;
+    --carbon: #111111;
+  }
+
+  * {
+    @apply border-gray-200;
+  }
+
+  body {
+    @apply text-carbon;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
