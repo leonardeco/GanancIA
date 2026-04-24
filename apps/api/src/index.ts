@@ -13,6 +13,7 @@ import importRoutes from "./routes/import.js"
 import { chatRoutes } from "./routes/chat.js"
 import alertsRoutes from "./routes/alerts.js"
 import inventoryRoutes from "./routes/inventory.js"
+import { startScheduler } from "./jobs/scheduler.js"
 
 const app = Fastify({ logger: true })
 
@@ -49,6 +50,9 @@ async function start() {
   const port = Number(process.env.PORT ?? 4000)
   await app.listen({ port, host: "0.0.0.0" })
   console.log(`API corriendo en http://localhost:${port}`)
+
+  // Iniciar jobs periodicos (alertas + reportes semanales)
+  startScheduler(app.db)
 }
 
 start().catch((err) => {

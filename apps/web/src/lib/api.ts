@@ -37,6 +37,8 @@ export const api = {
     get: (id: string) => request<unknown>(`/restaurants/${id}`),
     create: (data: { name: string; currency?: string; timezone?: string }) =>
       request<unknown>("/restaurants", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: { name?: string; currency?: string; timezone?: string; alertThreshold?: number }) =>
+      request<unknown>(`/restaurants/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     branches: (id: string) => request<unknown[]>(`/restaurants/${id}/branches`),
     createBranch: (id: string, data: { name: string; address?: string }) =>
       request<unknown>(`/restaurants/${id}/branches`, { method: "POST", body: JSON.stringify(data) }),

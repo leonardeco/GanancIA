@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Send, Loader2 } from "lucide-react"
+import { useState, useRef, useEffect, useCallback } from "react"
+import { Send, Loader2, Trash2 } from "lucide-react"
 import { MessageBubble } from "./MessageBubble"
 import { api } from "@/lib/api"
 import { useRestaurantStore } from "@/store/restaurant"
@@ -12,14 +12,33 @@ interface ChatMessage {
   content: string
 }
 
+const STORAGE_KEY = (restaurantId: string) => `ganancia-chat-${restaurantId}`
+const MAX_STORED = 40 // maximo de mensajes a persistir
+
+function loadHistory(restaurantId: string): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY(restaurantId))
+    if (!raw) return []
+    return JSON.parse(raw) as ChatMessage[]
+  } catch {
+    return []
+  }
+}
+
+function saveHistory(restaurantId: string, messages: ChatMessage[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY(restaurantId), JSON.stringify(messages.slice(-MAX_STORED)))
+  } catch { /* storage lleno — ignorar */ }
+}
+
 export function ChatWindow() {
   const { activeRestaurant } = useRestaurantStore()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const initialized = useRef<string | null>(null)
 
-  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
@@ -28,24 +47,39 @@ export function ChatWindow() {
     scrollToBottom()
   }, [messages, isLoading])
 
-  // Initial welcome message
+  // Cargar historial cuando cambia el restaurante activo
   useEffect(() => {
-    if (messages.length === 0 && activeRestaurant) {
-      setMessages([
-        {
-          role: "assistant",
-          content: `¡Hola! Soy Gana, tu asistente de inteligencia artificial para ${activeRestaurant.name}. Analizo tus ventas y costos para darte recomendaciones de rentabilidad. ¿En qué te puedo ayudar hoy?`
-        }
-      ])
+    if (!activeRestaurant) return
+    if (initialized.current === activeRestaurant.id) return
+    initialized.current = activeRestaurant.id
+
+    const history = loadHistory(activeRestaurant.id)
+    if (history.length > 0) {
+      setMessages(history)
+    } else {
+      setMessages([{
+        role: "assistant",
+        content: `¡Hola! Soy Gana, tu asistente de inteligencia artificial para ${activeRestaurant.name}. Analizo tus ventas y costos para darte recomendaciones de rentabilidad. ¿En qué te puedo ayudar hoy?`,
+      }])
     }
-  }, [activeRestaurant, messages.length])
+  }, [activeRestaurant])
+
+  const clearHistory = useCallback(() => {
+    if (!activeRestaurant) return
+    localStorage.removeItem(STORAGE_KEY(activeRestaurant.id))
+    initialized.current = null
+    setMessages([{
+      role: "assistant",
+      content: `Historial borrado. ¡Empecemos de nuevo! ¿En qué te puedo ayudar con ${activeRestaurant.name}?`,
+    }])
+  }, [activeRestaurant])
 
   async function handleSend() {
     if (!input.trim() || !activeRestaurant || isLoading) return
 
     const userMsg: ChatMessage = { role: "user", content: input.trim() }
     const newHistory = [...messages, userMsg]
-    
+
     setMessages(newHistory)
     setInput("")
     setIsLoading(true)
@@ -53,15 +87,14 @@ export function ChatWindow() {
     try {
       const { response } = await api.chat.send({
         restaurantId: activeRestaurant.id,
-        messages: newHistory
+        messages: newHistory,
       })
-
-      setMessages([...newHistory, { role: "assistant", content: response }])
+      const updated = [...newHistory, { role: "assistant" as const, content: response }]
+      setMessages(updated)
+      saveHistory(activeRestaurant.id, updated)
     } catch (error) {
       console.error(error)
       toast.error("Hubo un problema al conectar con Gana.")
-      // Remove the user message if it failed, or add an error message.
-      // We'll just leave the user message and let them try again.
     } finally {
       setIsLoading(false)
     }
@@ -69,6 +102,17 @@ export function ChatWindow() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50/50 rounded-2xl border border-gray-100 overflow-hidden relative">
+      {/* Header con boton de limpiar */}
+      {activeRestaurant && messages.length > 1 && (
+        <div className="flex items-center justify-end px-5 py-2 border-b border-gray-100 bg-white">
+          <button
+            onClick={clearHistory}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <Trash2 size={12} /> Borrar historial
+          </button>
+        </div>
+      )}
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-6">
         {!activeRestaurant ? (

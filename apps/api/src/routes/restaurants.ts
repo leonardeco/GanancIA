@@ -7,6 +7,7 @@ const createRestaurantBody = z.object({
   name: z.string().min(2),
   currency: z.string().default("USD"),
   timezone: z.string().default("America/Argentina/Buenos_Aires"),
+  alertThreshold: z.number().min(1).max(100).optional(),
 })
 
 const createBranchBody = z.object({
@@ -30,9 +31,13 @@ const restaurantRoutes: FastifyPluginAsync = async (app) => {
     const body = createRestaurantBody.safeParse(req.body)
     if (!body.success) return reply.status(400).send({ error: body.error.flatten() })
 
+    const { alertThreshold, ...rest } = body.data
+    const insertData: Record<string, unknown> = { ...rest, ownerId: sub }
+    if (alertThreshold !== undefined) insertData.alertThreshold = String(alertThreshold)
+
     const [restaurant] = await app.db
       .insert(restaurants)
-      .values({ ...body.data, ownerId: sub })
+      .values(insertData as any)
       .returning()
     return reply.status(201).send(restaurant)
   })
@@ -54,9 +59,14 @@ const restaurantRoutes: FastifyPluginAsync = async (app) => {
     const body = createRestaurantBody.partial().safeParse(req.body)
     if (!body.success) return reply.status(400).send({ error: body.error.flatten() })
 
+    const updateData: Record<string, unknown> = { ...body.data }
+    if (body.data.alertThreshold !== undefined) {
+      updateData.alertThreshold = String(body.data.alertThreshold)
+    }
+
     const [updated] = await app.db
       .update(restaurants)
-      .set(body.data)
+      .set(updateData)
       .where(and(eq(restaurants.id, id), eq(restaurants.ownerId, sub)))
       .returning()
     if (!updated) return reply.status(404).send({ error: "Restaurante no encontrado" })

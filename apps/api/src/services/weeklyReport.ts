@@ -48,9 +48,9 @@ async function getWeeklyMetrics(db: DB, restaurantId: string, weekStart: Date, w
     }).from(menuItems).where(
       sql`${menuItems.id} = ANY(ARRAY[${sql.join(itemIds.map((id) => sql`${id}::uuid`), sql`, `)}])`
     )
-    const costMap = new Map(costs.map((c: any) => [c.id, Number(c.costPrice)]))
-    totalCost = salesRows.reduce((sum: number, s: any) =>
-      sum + (s.menuItemId ? (costMap.get(s.menuItemId) ?? 0) : 0) * s.quantity, 0
+    const costMap = new Map((costs as any[]).map((c) => [c.id, Number(c.costPrice)]))
+    totalCost = (salesRows as any[]).reduce((sum: number, s) =>
+      sum + (s.menuItemId ? (costMap.get(s.menuItemId) ?? 0) : 0) * Number(s.quantity), 0
     )
   }
 
@@ -81,7 +81,7 @@ async function getWeeklyMetrics(db: DB, restaurantId: string, weekStart: Date, w
     ticketAverage: Math.round(ticketAverage * 100) / 100,
     covers,
     txCount,
-    topItems: topItems.map((i: any) => ({
+    topItems: (topItems as any[]).map((i) => ({
       name: i.name,
       units: Number(i.units),
       revenue: Number(i.revenue),
