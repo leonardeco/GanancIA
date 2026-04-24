@@ -62,11 +62,13 @@ ganancia/
 │   │   ├── src/
 │   │   │   ├── app/
 │   │   │   │   ├── (app)/
-│   │   │   │   │   ├── dashboard/   # KPIs y gráficas
-│   │   │   │   │   ├── menu/        # Matriz BCG
-│   │   │   │   │   ├── ventas/      # Registro e importación de ventas
-│   │   │   │   │   ├── fugas/       # Alertas de anomalías
-│   │   │   │   │   └── chat/        # Chatbot Gana IA
+│   │   │   │   │   ├── dashboard/      # KPIs y gráficas
+│   │   │   │   │   ├── menu/           # Matriz BCG + simulador de precios
+│   │   │   │   │   ├── ventas/         # Registro manual e importación CSV
+│   │   │   │   │   ├── inventario/     # Control de stock real vs. teórico
+│   │   │   │   │   ├── fugas/          # Alertas de anomalías
+│   │   │   │   │   ├── chat/           # Chatbot Gana IA
+│   │   │   │   │   └── configuracion/  # Settings del restaurante
 │   │   │   │   └── (auth)/
 │   │   │   │       ├── login/
 │   │   │   │       └── register/
@@ -86,13 +88,18 @@ ganancia/
 │           ├── routes/
 │           │   ├── auth.ts
 │           │   ├── analytics.ts    # KPIs, revenue chart, top items
-│           │   ├── menu.ts         # CRUD platos
-│           │   ├── alerts.ts       # Fugas y alertas
+│           │   ├── menu.ts         # CRUD platos + simulador de precios
+│           │   ├── alerts.ts       # Fugas, alertas + scan manual + reporte semanal
+│           │   ├── inventory.ts    # Control de inventario (real vs. teórico)
 │           │   ├── chat.ts         # Proxy a Claude API
 │           │   ├── sales.ts
 │           │   └── restaurants.ts
 │           ├── services/
-│           │   └── gana.ts         # System prompt + Claude API
+│           │   ├── gana.ts         # Claude Sonnet 4.6 + prompt caching
+│           │   ├── alertEngine.ts  # Motor de detección automática de anomalías
+│           │   └── weeklyReport.ts # Generador de reportes semanales con Gana
+│           ├── jobs/
+│           │   └── scheduler.ts    # node-cron: alertas 6h + reporte lunes 08:00
 │           └── plugins/
 │               ├── auth.ts         # JWT middleware
 │               └── db.ts           # Drizzle connection
@@ -151,11 +158,25 @@ weekly_reports     → id · restaurant_id · week_start · metrics_json · sent
 - Sistema de severidades: **Crítica** 🔴, **Advertencia** 🟡, **Informativa** 🔵
 
 ### 🤖 Chatbot Gana — Asistente IA
-- Motor: **Claude 3.5 Sonnet** (Anthropic API)
-- Datos en tiempo real inyectados dinámicamente en el System Prompt
-- Responde sobre ventas, costos, fugas, ranking de meseros y predicciones
-- Historial de conversación multi-turno
+- Motor: **Claude Sonnet 4.6** (Anthropic SDK con prompt caching)
+- Datos en tiempo real inyectados dinámicamente en el system prompt
+- Responde sobre ventas, costos, fugas, platos top y rentabilidad
+- Historial de conversación persistido en localStorage por restaurante
 - Fallback inteligente con respuestas mock si no hay API key configurada
+
+### 📦 Control de Inventario
+- Registro de costo real vs. teórico por ingrediente
+- Cálculo automático de variación y merma
+- Alertas automáticas al superar el umbral configurado por restaurante
+
+### 💰 Simulador de Precios
+- Calcula el impacto mensual de cambiar el precio de un plato
+- Basado en unidades vendidas reales de los últimos 30 días
+- Resultado inmediato: ganancia actual vs. ganancia proyectada
+
+### ⚙️ Jobs Automáticos (node-cron)
+- Motor de alertas corre cada 6 horas detectando anomalías en ventas e inventario
+- Reporte semanal generado por Gana cada lunes a las 08:00
 
 ---
 
@@ -245,15 +266,22 @@ pnpm dev
 - [x] Dashboard con KPIs financieros (RevPASH, ticket promedio, margen)
 - [x] Ingeniería de menú con Matriz BCG automática
 - [x] Detección de fugas y sistema de alertas
-- [x] Chatbot Gana con Claude API
-- [x] Schema completo de base de datos (9 tablas)
-- [x] Seed de datos para desarrollo
+- [x] Dashboard con KPIs financieros (ingresos, margen, ticket promedio, cubiertos)
+- [x] Ingeniería de menú con Matriz BCG automática
+- [x] Detección de fugas y sistema de alertas
+- [x] Chatbot Gana con Claude Sonnet 4.6 + prompt caching
+- [x] Control de inventario (costo real vs. teórico + alertas automáticas)
+- [x] Simulador de precios con impacto mensual proyectado
+- [x] Landing page pública en ganancia.app
+- [x] Jobs automáticos con node-cron (alertas cada 6h + reporte semanal)
+- [x] Historial de chat persistido en localStorage
+- [x] Página de configuración (moneda, zona horaria, umbral de alertas, sucursales)
+- [x] Schema completo de base de datos (10 tablas + relaciones)
 - [ ] Stripe Billing (planes Starter $49 / Pro $99 / Cadena $249)
-- [ ] Landing Page pública ganancia.app
-- [ ] Jobs automáticos BullMQ (reporte semanal, detector de fugas, sync POS)
-- [ ] Integración WhatsApp Business API
+- [ ] Integración WhatsApp Business API (Gana bidireccional)
 - [ ] Microservicio Python (FastAPI + Prophet para predicción de demanda)
 - [ ] Integración POS: Square / Toast / Clover (OAuth 2.0)
+- [ ] Costeo por ingredientes (desglose de receta por insumo)
 - [ ] Modo PWA (instalable en celular)
 
 ---
